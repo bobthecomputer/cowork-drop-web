@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cowork Drop Web</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Cowork Drop Photo App</title>
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
@@ -11,87 +11,79 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">GitHub Pages Prototype</p>
-          <h1>Mobile test build for the drop and gallery idea.</h1>
+          <p class="eyebrow">Mobile Photo App Prototype</p>
+          <h1>Your photos, grouped and previewed like an actual gallery.</h1>
           <p class="hero-copy">
-            This version is static and deployable on GitHub Pages. It lets you test the phone UX, gallery feel, and
-            selection flows directly in mobile Safari or Chrome. It does not include the real desktop transfer backend.
+            This hosted build is now a photo app first: timeline browsing, albums, favorites, fullscreen viewing,
+            batch actions, and import staging that feels like a phone gallery instead of a file list.
           </p>
         </div>
         <div class="hero-badges">
           <span class="pill" id="device-pill">Browser mode</span>
-          <span class="pill" id="asset-pill">0 items</span>
-          <span class="pill" id="note-pill">No share note</span>
+          <span class="pill" id="count-pill">0 items</span>
+          <span class="pill" id="album-pill">All Photos</span>
+          <span class="pill" id="selection-pill">Selection off</span>
         </div>
       </header>
 
       <nav class="tabs">
-        <button class="tab-button is-active" data-tab="nearby">Nearby</button>
-        <button class="tab-button" data-tab="gallery">Gallery</button>
-        <button class="tab-button" data-tab="about">Deploy</button>
+        <button class="tab-button is-active" data-tab="photos">Photos</button>
+        <button class="tab-button" data-tab="albums">Albums</button>
+        <button class="tab-button" data-tab="import">Import</button>
       </nav>
 
-      <section class="panel-grid is-active" data-panel="nearby">
-        <section class="card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Phone Intake</p>
-              <h2>Pick files and a note locally</h2>
-            </div>
-          </div>
-          <textarea id="share-note" rows="5" placeholder="Optional note to keep with this mobile session."></textarea>
-          <input id="asset-input" type="file" multiple accept="image/*,video/*" />
-          <div class="record-controls">
-            <button class="primary-button" id="save-button">Save To Demo Gallery</button>
-            <button class="ghost-button" id="clear-button">Clear Demo Data</button>
-          </div>
-          <p class="status-line" id="save-status">Choose files to build a mobile test session.</p>
-        </section>
-
-        <section class="card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Session Feed</p>
-              <h2>What would have been transferred</h2>
-            </div>
-          </div>
-          <div class="list-frame" id="session-feed"></div>
-        </section>
-
-        <section class="card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Selected Items</p>
-              <h2>Mobile preview strip</h2>
-            </div>
-          </div>
-          <p class="status-line" id="staging-summary">No staged files yet.</p>
-          <div class="gallery-grid-frame compact-grid" id="staging-grid"></div>
-        </section>
+      <section class="selection-toolbar" id="selection-toolbar">
+        <div>
+          <strong id="selection-copy">Selection mode off</strong>
+          <span id="selection-detail">Tap Select to batch-share, batch-download, or remove multiple items.</span>
+        </div>
+        <div class="record-controls">
+          <button class="ghost-button" id="select-toggle-button">Select</button>
+          <button class="ghost-button" id="favorite-selected-button" disabled>Favorite</button>
+          <button class="ghost-button" id="download-selected-button" disabled>Download</button>
+          <button class="ghost-button" id="share-selected-button" disabled>Share</button>
+          <button class="ghost-button" id="delete-selected-button" disabled>Delete</button>
+          <button class="ghost-button" id="clear-selection-button" disabled>Clear</button>
+        </div>
       </section>
 
-      <section class="panel-grid" data-panel="gallery">
+      <section class="panel-grid is-active" data-panel="photos">
         <section class="card span-two">
           <div class="card-head">
             <div>
-              <p class="eyebrow">Demo Gallery</p>
-              <h2>Locally stored on this phone or browser</h2>
+              <p class="eyebrow">Timeline</p>
+              <h2>Photos grouped by day and month</h2>
+            </div>
+            <div class="record-controls">
+              <button class="ghost-button" id="all-photos-filter">All Photos</button>
+              <button class="ghost-button" id="favorites-filter">Favorites</button>
+              <button class="ghost-button" id="videos-filter">Videos</button>
+              <button class="ghost-button" id="recent-filter">Recently Added</button>
             </div>
           </div>
-          <p class="status-line" id="gallery-summary">No saved items yet.</p>
-          <div class="gallery-grid-frame" id="gallery-grid"></div>
+          <p class="status-line" id="photos-summary">No saved items yet.</p>
+          <section class="recent-strip-shell">
+            <div class="section-head">
+              <h3>Recently Added</h3>
+              <span id="recent-summary">Nothing imported yet.</span>
+            </div>
+            <div class="recent-strip" id="recent-strip"></div>
+          </section>
+          <div class="timeline" id="timeline"></div>
         </section>
 
         <section class="card">
           <div class="card-head">
             <div>
-              <p class="eyebrow">Detail</p>
-              <h2>Preview and metadata</h2>
+              <p class="eyebrow">Preview</p>
+              <h2>Selected photo details</h2>
             </div>
           </div>
-          <div class="preview-frame" id="preview-frame">Tap a saved item to preview it here.</div>
+          <div class="preview-frame" id="preview-frame">Tap an item to preview it here.</div>
           <div class="record-controls">
-            <button class="primary-button" id="download-button" disabled>Download</button>
+            <button class="primary-button" id="viewer-open-button" disabled>Open Fullscreen</button>
+            <button class="ghost-button" id="favorite-button" disabled>Favorite</button>
+            <button class="ghost-button" id="download-button" disabled>Download</button>
             <button class="ghost-button" id="share-button" disabled>Share</button>
             <button class="ghost-button" id="delete-button" disabled>Delete</button>
           </div>
@@ -99,54 +91,80 @@
         </section>
       </section>
 
-      <section class="panel-grid" data-panel="about">
-        <section class="card span-two">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">GitHub</p>
-              <h2>Repository and Pages deployment</h2>
-            </div>
-          </div>
-          <div class="list-frame">
-            <article class="list-row">
-              <strong>1. Create a new empty GitHub repository.</strong>
-              <span>Name it something like <code>cowork-drop-web</code>.</span>
-            </article>
-            <article class="list-row">
-              <strong>2. Push this folder as its own repository.</strong>
-              <span>Commands are in the README below.</span>
-            </article>
-            <article class="list-row">
-              <strong>3. In GitHub, enable Pages with GitHub Actions.</strong>
-              <span>The workflow in this repo will build and publish automatically on every push to <code>main</code>.</span>
-            </article>
-          </div>
-        </section>
-
+      <section class="panel-grid" data-panel="albums">
         <section class="card">
           <div class="card-head">
             <div>
-              <p class="eyebrow">Reality Check</p>
-              <h2>What this hosted version is</h2>
+              <p class="eyebrow">Smart Albums</p>
+              <h2>Jump into groups that feel useful</h2>
             </div>
           </div>
-          <div class="list-frame">
-            <article class="list-row">
-              <strong>Works now</strong>
-              <span>Mobile UI, local note/file staging, local saved gallery, GitHub Pages deployment.</span>
-            </article>
-            <article class="list-row">
-              <strong>Not in Pages</strong>
-              <span>Real Windows peer discovery, Tauri backend commands, or live cross-device transfer.</span>
-            </article>
-            <article class="list-row">
-              <strong>Next upgrade</strong>
-              <span>Add a real hosted signaling or storage backend once the mobile experience feels right.</span>
-            </article>
+          <div class="album-grid" id="album-grid"></div>
+        </section>
+
+        <section class="card span-two">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Album Contents</p>
+              <h2 id="album-title">All Photos</h2>
+            </div>
           </div>
+          <p class="status-line" id="album-summary">No album selected yet.</p>
+          <div class="gallery-grid-frame" id="album-grid-frame"></div>
+        </section>
+      </section>
+
+      <section class="panel-grid" data-panel="import">
+        <section class="card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Import</p>
+              <h2>Bring in photos and videos</h2>
+            </div>
+          </div>
+          <textarea id="share-note" rows="5" placeholder="Optional note to attach to this import batch."></textarea>
+          <input id="asset-input" type="file" multiple accept="image/*,video/*" />
+          <div class="record-controls">
+            <button class="primary-button" id="save-button">Save To Library</button>
+            <button class="ghost-button" id="clear-import-button">Clear Import Queue</button>
+            <button class="ghost-button" id="clear-library-button">Reset Entire Library</button>
+          </div>
+          <p class="status-line" id="save-status">Choose files to start building the photo library.</p>
+        </section>
+
+        <section class="card span-two">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Import Queue</p>
+              <h2>Preview before saving</h2>
+            </div>
+          </div>
+          <p class="status-line" id="staging-summary">No staged files yet.</p>
+          <div class="gallery-grid-frame" id="staging-grid"></div>
         </section>
       </section>
     </main>
+
+    <aside class="viewer-shell is-hidden" id="viewer-shell">
+      <div class="viewer-topbar">
+        <button class="viewer-button" id="viewer-close-button">Close</button>
+        <div class="viewer-title">
+          <strong id="viewer-name">Preview</strong>
+          <span id="viewer-meta">0 / 0</span>
+        </div>
+        <div class="viewer-actions">
+          <button class="viewer-button" id="viewer-favorite-button">Favorite</button>
+          <button class="viewer-button" id="viewer-share-button">Share</button>
+          <button class="viewer-button" id="viewer-download-button">Download</button>
+        </div>
+      </div>
+      <div class="viewer-stage" id="viewer-stage">
+        <button class="viewer-nav viewer-prev" id="viewer-prev-button" aria-label="Previous item">‹</button>
+        <div class="viewer-media" id="viewer-media">No preview</div>
+        <button class="viewer-nav viewer-next" id="viewer-next-button" aria-label="Next item">›</button>
+      </div>
+      <div class="viewer-strip" id="viewer-strip"></div>
+    </aside>
 
     <script type="module" src="./src/main.ts"></script>
   </body>
