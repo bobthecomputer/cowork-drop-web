@@ -1,12 +1,21 @@
+type AssetKind = "image" | "video" | "file";
+
 type StoredAsset = {
   id: string;
   name: string;
-  kind: "image" | "video" | "file";
+  kind: AssetKind;
   mime: string;
   size: number;
   note: string;
   createdAt: string;
   dataUrl: string;
+};
+
+type StagedAsset = {
+  id: string;
+  file: File;
+  kind: AssetKind;
+  previewUrl: string;
 };
 
 const STORAGE_KEY = "cowork-drop-web-assets";
@@ -22,15 +31,20 @@ const els = {
   clearButton: byId<HTMLButtonElement>("clear-button"),
   saveStatus: byId("save-status"),
   sessionFeed: byId("session-feed"),
+  stagingSummary: byId("staging-summary"),
   stagingGrid: byId("staging-grid"),
   gallerySummary: byId("gallery-summary"),
   galleryGrid: byId("gallery-grid"),
   previewFrame: byId("preview-frame"),
   metaGrid: byId("meta-grid"),
+  downloadButton: byId<HTMLButtonElement>("download-button"),
+  shareButton: byId<HTMLButtonElement>("share-button"),
+  deleteButton: byId<HTMLButtonElement>("delete-button"),
 };
 
-let stagedFiles: File[] = [];
+let stagedAssets: StagedAsset[] = [];
 let assets: StoredAsset[] = loadAssets();
+let selectedAssetId = assets[0]?.id ?? "";
 
 wireTabs();
 wireActions();
@@ -50,13 +64,20 @@ function wireTabs(): void {
 function wireActions(): void {
   els.shareNote.value = localStorage.getItem(NOTE_KEY) ?? "";
   els.assetInput.addEventListener("change", () => {
-    stagedFiles = Array.from(els.assetInput.files ?? []);
-    renderStaging();
+    resetStaging();
+    stagedAssets = Array.from(els.assetInput.files ?? []).map((file, index) => ({
+      id: `stage-${Date.now()}-${index}`,
+      file,
+      kind: classify(file.type),
+      previewUrl: URL.createObjectURL(file),
+    }));
+    render();
   });
   els.saveButton.addEventListener("click", () => void saveFiles());
   els.clearButton.addEventListener("click", () => {
-    stagedFiles = [];
+    resetStaging();
     assets = [];
+    selectedAssetId = "";
     els.assetInput.value = "";
     els.shareNote.value = "";
     localStorage.removeItem(STORAGE_KEY);
@@ -67,36 +88,43 @@ function wireActions(): void {
     localStorage.setItem(NOTE_KEY, els.shareNote.value);
     renderPills();
   });
+  els.downloadButton.addEventListener("click", () => downloadSelected());
+  els.shareButton.addEventListener("click", () => void shareSelected());
+  els.deleteButton.addEventListener("click", () => deleteSelected());
 }
 
 async function saveFiles(): Promise<void> {
-  if (!stagedFiles.length && !els.shareNote.value.trim()) {
+  if (!stagedAssets.length && !els.shareNote.value.trim()) {
     els.saveStatus.textContent = "Add files or a note first.";
     return;
   }
 
   const newAssets: StoredAsset[] = [];
-  for (const file of stagedFiles) {
+  for (const staged of stagedAssets) {
     newAssets.push({
       id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      name: file.name,
-      kind: classify(file.type),
-      mime: file.type || "application/octet-stream",
-      size: file.size,
+      name: staged.file.name,
+      kind: staged.kind,
+      mime: staged.file.type || "application/octet-stream",
+      size: staged.file.size,
       note: els.shareNote.value.trim(),
       createdAt: new Date().toISOString(),
-      dataUrl: await fileToDataUrl(file),
+      dataUrl: await fileToDataUrl(staged.file),
     });
   }
 
   assets = [...newAssets, ...assets];
+  if (newAssets[0]) {
+    selectedAssetId = newAssets[0].id;
+  }
   persistAssets(assets);
   localStorage.setItem(NOTE_KEY, els.shareNote.value);
-  stagedFiles = [];
   els.assetInput.value = "";
+  resetStaging();
   els.saveStatus.textContent = newAssets.length
     ? `Saved ${newAssets.length} item(s) into the browser gallery.`
     : "Saved the share note for this browser session.";
+  activateTab("gallery");
   render();
 }
 
@@ -105,6 +133,7 @@ function render(): void {
   renderStaging();
   renderSessionFeed();
   renderGallery();
+  renderSelectedAsset();
 }
 
 function renderPills(): void {
@@ -115,19 +144,42 @@ function renderPills(): void {
 }
 
 function renderStaging(): void {
-  els.stagingGrid.innerHTML = stagedFiles.length
-    ? stagedFiles
+  els.stagingSummary.textContent = stagedAssets.length
+    ? `${stagedAssets.length} file(s) ready to save into the demo gallery.`
+    : "No staged files yet.";
+  els.stagingGrid.innerHTML = stagedAssets.length
+    ? stagedAssets
         .map(
-          (file) => `
+          (asset) => `
             <article class="asset-card">
-              <div class="asset-body">
-                <span class="asset-name">${escapeHtml(file.name)}</span>
-                <span class="asset-meta">${formatBytes(file.size)} • ${escapeHtml(classify(file.type))}</span>
-              </div>
+              <button class="asset-remove" data-stage-remove="${asset.id}">Remove</button>
+              <button data-stage-id="${asset.id}">
+                ${renderStagedMedia(asset)}
+                <div class="asset-body">
+                  <span class="asset-name">${escapeHtml(asset.file.name)}</span>
+                  <span class="asset-meta">${formatBytes(asset.file.size)} • ${escapeHtml(asset.kind)}</span>
+                </div>
+              </button>
             </article>`,
         )
         .join("")
     : `<article class="list-row">No staged files yet.</article>`;
+
+  els.stagingGrid.querySelectorAll<HTMLElement>("[data-stage-remove]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const id = button.dataset.stageRemove;
+      if (!id) {
+        return;
+      }
+      const asset = stagedAssets.find((entry) => entry.id === id);
+      if (asset) {
+        URL.revokeObjectURL(asset.previewUrl);
+      }
+      stagedAssets = stagedAssets.filter((entry) => entry.id !== id);
+      render();
+    });
+  });
 }
 
 function renderSessionFeed(): void {
@@ -154,15 +206,15 @@ function renderSessionFeed(): void {
 
 function renderGallery(): void {
   els.gallerySummary.textContent = assets.length
-    ? `${assets.length} item(s) saved in this browser.`
+    ? `${assets.length} item(s) saved in this browser. Tap one for a full preview.`
     : "No saved items yet.";
   els.galleryGrid.innerHTML = assets.length
     ? assets
         .map(
           (asset) => `
-            <article class="asset-card">
+            <article class="asset-card ${asset.id === selectedAssetId ? "is-selected" : ""}">
               <button data-asset-id="${asset.id}">
-                ${renderAssetMedia(asset)}
+                ${renderStoredMedia(asset)}
                 <div class="asset-body">
                   <span class="asset-name">${escapeHtml(asset.name)}</span>
                   <span class="asset-meta">${formatBytes(asset.size)} • ${escapeHtml(asset.kind)}</span>
@@ -176,17 +228,28 @@ function renderGallery(): void {
   els.galleryGrid.querySelectorAll<HTMLButtonElement>("[data-asset-id]").forEach((button) => {
     button.addEventListener("click", () => {
       const id = button.dataset.assetId;
-      const asset = assets.find((entry) => entry.id === id);
-      if (!asset) {
+      if (!id) {
         return;
       }
-      renderPreview(asset);
+      selectedAssetId = id;
+      renderSelectedAsset();
+      renderGallery();
     });
   });
 }
 
-function renderPreview(asset: StoredAsset): void {
-  els.previewFrame.innerHTML = renderAssetMedia(asset);
+function renderSelectedAsset(): void {
+  const asset = assets.find((entry) => entry.id === selectedAssetId);
+  if (!asset) {
+    els.previewFrame.textContent = "Tap a saved item to preview it here.";
+    els.metaGrid.innerHTML = "";
+    els.downloadButton.disabled = true;
+    els.shareButton.disabled = true;
+    els.deleteButton.disabled = true;
+    return;
+  }
+
+  els.previewFrame.innerHTML = renderStoredMedia(asset, true);
   els.metaGrid.innerHTML = [
     metaRow("Name", asset.name),
     metaRow("Kind", asset.kind),
@@ -195,16 +258,73 @@ function renderPreview(asset: StoredAsset): void {
     metaRow("Saved", formatDate(asset.createdAt)),
     metaRow("Note", asset.note || "No note"),
   ].join("");
+  els.downloadButton.disabled = false;
+  els.shareButton.disabled = false;
+  els.deleteButton.disabled = false;
 }
 
-function renderAssetMedia(asset: StoredAsset): string {
+function renderStagedMedia(asset: StagedAsset): string {
+  if (asset.kind === "image") {
+    return `<img src="${asset.previewUrl}" alt="${escapeHtml(asset.file.name)}" />`;
+  }
+  if (asset.kind === "video") {
+    return `<video src="${asset.previewUrl}" playsinline muted></video>`;
+  }
+  return `<div class="list-row">Preview unavailable.</div>`;
+}
+
+function renderStoredMedia(asset: StoredAsset, withControls = false): string {
   if (asset.kind === "image") {
     return `<img src="${asset.dataUrl}" alt="${escapeHtml(asset.name)}" />`;
   }
   if (asset.kind === "video") {
-    return `<video src="${asset.dataUrl}" controls playsinline muted></video>`;
+    return `<video src="${asset.dataUrl}" ${withControls ? "controls" : ""} playsinline muted></video>`;
   }
   return `<div class="list-row">Preview unavailable.</div>`;
+}
+
+function downloadSelected(): void {
+  const asset = assets.find((entry) => entry.id === selectedAssetId);
+  if (!asset) {
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = asset.dataUrl;
+  link.download = asset.name;
+  link.click();
+}
+
+async function shareSelected(): Promise<void> {
+  const asset = assets.find((entry) => entry.id === selectedAssetId);
+  if (!asset) {
+    return;
+  }
+  if (!navigator.share) {
+    els.saveStatus.textContent = "This browser does not support direct share. Use Download instead.";
+    return;
+  }
+  try {
+    const file = dataUrlToFile(asset.dataUrl, asset.name, asset.mime);
+    await navigator.share({
+      title: asset.name,
+      text: asset.note || asset.name,
+      files: [file],
+    });
+  } catch {
+    els.saveStatus.textContent = "Share was cancelled or unavailable for this file.";
+  }
+}
+
+function deleteSelected(): void {
+  const asset = assets.find((entry) => entry.id === selectedAssetId);
+  if (!asset) {
+    return;
+  }
+  assets = assets.filter((entry) => entry.id !== asset.id);
+  persistAssets(assets);
+  selectedAssetId = assets[0]?.id ?? "";
+  els.saveStatus.textContent = `Deleted ${asset.name} from the demo gallery.`;
+  render();
 }
 
 function persistAssets(nextAssets: StoredAsset[]): void {
@@ -223,7 +343,7 @@ function loadAssets(): StoredAsset[] {
   }
 }
 
-function classify(mime: string): "image" | "video" | "file" {
+function classify(mime: string): AssetKind {
   if (mime.startsWith("image/")) {
     return "image";
   }
@@ -233,6 +353,11 @@ function classify(mime: string): "image" | "video" | "file" {
   return "file";
 }
 
+function resetStaging(): void {
+  stagedAssets.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
+  stagedAssets = [];
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -240,6 +365,24 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+function dataUrlToFile(dataUrl: string, name: string, mime: string): File {
+  const [header, body] = dataUrl.split(",");
+  const encoded = header.includes(";base64");
+  const raw = encoded ? atob(body) : decodeURIComponent(body);
+  const bytes = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index += 1) {
+    bytes[index] = raw.charCodeAt(index);
+  }
+  return new File([bytes], name, { type: mime });
+}
+
+function activateTab(tab: string): void {
+  document.querySelectorAll(".tab-button").forEach((item) => item.classList.remove("is-active"));
+  document.querySelectorAll<HTMLElement>(".panel-grid").forEach((panel) => panel.classList.remove("is-active"));
+  bySelector<HTMLElement>(`[data-tab="${tab}"]`).classList.add("is-active");
+  bySelector<HTMLElement>(`[data-panel="${tab}"]`).classList.add("is-active");
 }
 
 function mobileLabel(): string {
@@ -299,3 +442,7 @@ function bySelector<T extends Element = Element>(selector: string): T {
   }
   return node as T;
 }
+
+window.addEventListener("beforeunload", () => {
+  resetStaging();
+});
