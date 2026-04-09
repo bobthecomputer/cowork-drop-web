@@ -48,12 +48,18 @@ const STORAGE_KEY = "cowork-drop-web-assets-v2";
 const LEGACY_STORAGE_KEY = "cowork-drop-web-assets";
 const NOTE_KEY = "cowork-drop-web-note";
 const UI_KEY = "cowork-drop-web-ui";
+const DESKTOP_URL_KEY = "cowork-drop-web-desktop-url";
+const MAX_LOCAL_IMPORT_BYTES = 4 * 1024 * 1024;
 
 const els = {
   devicePill: byId("device-pill"),
   countPill: byId("count-pill"),
   albumPill: byId("album-pill"),
   selectionPill: byId("selection-pill"),
+  syncCopy: byId("sync-copy"),
+  desktopUrlInput: byId<HTMLInputElement>("desktop-url-input"),
+  openDesktopButton: byId<HTMLButtonElement>("open-desktop-button"),
+  clearDesktopButton: byId<HTMLButtonElement>("clear-desktop-button"),
   selectionToolbar: byId("selection-toolbar"),
   selectionCopy: byId("selection-copy"),
   selectionDetail: byId("selection-detail"),
@@ -115,6 +121,7 @@ const state = {
   selectionMode: false,
   selectedIds: new Set<string>(),
   swipeStartX: 0,
+  desktopUrl: loadDesktopUrl(),
 };
 
 hydrateUiState();
@@ -131,6 +138,7 @@ function wireTabs(): void {
 
 function wireActions(): void {
   els.shareNote.value = localStorage.getItem(NOTE_KEY) ?? "";
+  els.desktopUrlInput.value = state.desktopUrl;
 
   els.assetInput.addEventListener("change", async () => {
     resetStaging();
@@ -144,6 +152,19 @@ function wireActions(): void {
 
   els.shareNote.addEventListener("input", () => {
     localStorage.setItem(NOTE_KEY, els.shareNote.value);
+  });
+  els.desktopUrlInput.addEventListener("input", () => {
+    state.desktopUrl = els.desktopUrlInput.value.trim();
+    persistDesktopUrl();
+    renderChrome();
+  });
+  els.openDesktopButton.addEventListener("click", () => openDesktopReceiver());
+  els.clearDesktopButton.addEventListener("click", () => {
+    state.desktopUrl = "";
+    els.desktopUrlInput.value = "";
+    persistDesktopUrl();
+    renderChrome();
+    els.saveStatus.textContent = "Desktop address cleared. This page is back in phone-only mode.";
   });
 
   els.saveButton.addEventListener("click", () => void saveImportQueue());
@@ -224,8 +245,16 @@ async function saveImportQueue(): Promise<void> {
     els.saveStatus.textContent = "Add files or a note first.";
     return;
   }
+  const totalBytes = state.stagedAssets.reduce((sum, asset) => sum + asset.file.size, 0);
+  if (totalBytes > MAX_LOCAL_IMPORT_BYTES) {
+    els.saveStatus.textContent =
+      "This batch is too large for browser-only storage. Use Open Synced Receiver so the files go to the Windows app.";
+    activateTab("import");
+    return;
+  }
 
   const note = els.shareNote.value.trim();
+  const previousAssets = [...state.assets];
   const createdAssets = await Promise.all(
     state.stagedAssets.map(async (staged) => ({
       id: createId(),
@@ -246,7 +275,13 @@ async function saveImportQueue(): Promise<void> {
   );
 
   state.assets = [...createdAssets, ...state.assets].sort(compareAssetsDesc);
-  persistAssets();
+  if (!persistAssets()) {
+    state.assets = previousAssets;
+    els.saveStatus.textContent =
+      "This import did not fit in browser storage. Open the synced receiver for large imports so they reach the PC library.";
+    render();
+    return;
+  }
   localStorage.setItem(NOTE_KEY, els.shareNote.value);
   els.assetInput.value = "";
   resetStaging();
@@ -441,10 +476,13 @@ function render(): void {
 
 function renderChrome(): void {
   const album = getAlbumDefinitions().find((entry) => entry.id === state.activeAlbum);
-  els.devicePill.textContent = mobileLabel();
+  els.devicePill.textContent = state.desktopUrl ? "Desktop receiver saved" : "Phone-only mode";
   els.countPill.textContent = `${state.assets.length} items`;
   els.albumPill.textContent = album?.title ?? "All Photos";
   els.selectionPill.textContent = state.selectionMode ? `${state.selectedIds.size} selected` : "Selection off";
+  els.syncCopy.textContent = state.desktopUrl
+    ? `Ready to open the synced receiver at ${state.desktopUrl}. Use that page when you want the Windows app to receive and index your files.`
+    : "Paste the local address shown in the Windows app, then open it. Large imports should go there so they land in the PC library instead of trying to live inside this browser.";
   els.selectionCopy.textContent = state.selectionMode ? "Selection mode on" : "Selection mode off";
   els.selectionDetail.textContent = state.selectionMode
     ? `${state.selectedIds.size} item(s) ready for batch actions.`
@@ -861,8 +899,13 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-function persistAssets(): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.assets));
+function persistAssets(): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.assets));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function loadAssets(): StoredAsset[] {
@@ -929,6 +972,49 @@ function persistUiState(): void {
     focusedAssetId: state.focusedAssetId,
   };
   localStorage.setItem(UI_KEY, JSON.stringify(payload));
+}
+
+function loadDesktopUrl(): string {
+  return localStorage.getItem(DESKTOP_URL_KEY)?.trim() ?? "";
+}
+
+function persistDesktopUrl(): void {
+  if (state.desktopUrl) {
+    localStorage.setItem(DESKTOP_URL_KEY, state.desktopUrl);
+  } else {
+    localStorage.removeItem(DESKTOP_URL_KEY);
+  }
+}
+
+function normalizeDesktopUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  try {
+    const url = new URL(withProtocol);
+    if (!url.pathname || url.pathname === "/") {
+      url.pathname = "/";
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function openDesktopReceiver(): void {
+  const normalized = normalizeDesktopUrl(els.desktopUrlInput.value);
+  if (!normalized) {
+    els.saveStatus.textContent = "Enter the local address shown in the Windows app first.";
+    activateTab("import");
+    return;
+  }
+  state.desktopUrl = normalized;
+  els.desktopUrlInput.value = normalized;
+  persistDesktopUrl();
+  renderChrome();
+  window.location.href = normalized;
 }
 
 function resetStaging(): void {

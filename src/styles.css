@@ -51,7 +51,8 @@ body {
 
 .hero,
 .card,
-.selection-toolbar {
+.selection-toolbar,
+.sync-strip {
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.38);
   box-shadow: var(--shadow);
@@ -119,6 +120,33 @@ body {
   border-radius: 999px;
   background: rgba(255, 248, 236, 0.74);
   border: 1px solid rgba(255, 255, 255, 0.36);
+}
+
+.sync-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 18px 20px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255, 251, 244, 0.94), rgba(255, 247, 234, 0.84));
+}
+
+.sync-strip h2 {
+  margin: 0;
+  font-family: "Georgia", "Times New Roman", serif;
+}
+
+.sync-copy {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.sync-controls {
+  display: grid;
+  gap: 10px;
 }
 
 .tab-button,
@@ -244,6 +272,7 @@ button:disabled {
 .album-card,
 .section-shell,
 textarea,
+input[type="text"],
 input[type="file"] {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.72);
@@ -257,6 +286,7 @@ input[type="file"] {
 }
 
 textarea,
+input[type="text"],
 input[type="file"] {
   width: 100%;
   border-radius: 18px;
@@ -542,7 +572,8 @@ code {
 @media (max-width: 1100px) {
   .hero,
   .panel-grid,
-  .selection-toolbar {
+  .selection-toolbar,
+  .sync-strip {
     grid-template-columns: 1fr;
   }
 

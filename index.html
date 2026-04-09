@@ -11,20 +11,36 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Mobile Photo App Prototype</p>
+          <p class="eyebrow">Mobile Photo App Companion</p>
           <h1>Your photos, grouped and previewed like an actual gallery.</h1>
           <p class="hero-copy">
-            This hosted build is now a photo app first: timeline browsing, albums, favorites, fullscreen viewing,
-            batch actions, and import staging that feels like a phone gallery instead of a file list.
+            This hosted build is a phone-first gallery surface. When you want real sync with the Windows app, open the
+            desktop receiver page from here instead of saving a large batch into browser storage.
           </p>
         </div>
         <div class="hero-badges">
-          <span class="pill" id="device-pill">Browser mode</span>
+          <span class="pill" id="device-pill">Phone-only mode</span>
           <span class="pill" id="count-pill">0 items</span>
           <span class="pill" id="album-pill">All Photos</span>
           <span class="pill" id="selection-pill">Selection off</span>
         </div>
       </header>
+
+      <section class="sync-strip">
+        <div>
+          <p class="eyebrow">Sync To PC</p>
+          <h2>Use the desktop receiver for the real shared library</h2>
+          <p class="sync-copy" id="sync-copy">
+            Paste the local address shown in the Windows app, then open it. Large imports should go there so they land
+            in the PC library instead of trying to live inside this browser.
+          </p>
+        </div>
+        <div class="sync-controls">
+          <input id="desktop-url-input" type="text" placeholder="http://192.168.x.x:12345/" />
+          <button class="primary-button" id="open-desktop-button">Open Synced Receiver</button>
+          <button class="ghost-button" id="clear-desktop-button">Clear Address</button>
+        </div>
+      </section>
 
       <nav class="tabs">
         <button class="tab-button is-active" data-tab="photos">Photos</button>
@@ -125,11 +141,14 @@
           <textarea id="share-note" rows="5" placeholder="Optional note to attach to this import batch."></textarea>
           <input id="asset-input" type="file" multiple accept="image/*,video/*" />
           <div class="record-controls">
-            <button class="primary-button" id="save-button">Save To Library</button>
+            <button class="primary-button" id="save-button">Save To This Phone Only</button>
             <button class="ghost-button" id="clear-import-button">Clear Import Queue</button>
             <button class="ghost-button" id="clear-library-button">Reset Entire Library</button>
           </div>
-          <p class="status-line" id="save-status">Choose files to start building the photo library.</p>
+          <p class="status-line" id="save-status">
+            Choose files to build this phone-only library, or open the synced receiver above for the real desktop
+            library.
+          </p>
         </section>
 
         <section class="card span-two">
